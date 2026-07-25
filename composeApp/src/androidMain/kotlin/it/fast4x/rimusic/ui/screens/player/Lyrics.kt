@@ -878,6 +878,7 @@ fun Lyrics(
                     thumbnailUrl = mediaMetadata.artworkUri?.toString(),
                     mediaId = mediaId,
                     currentPosition = player.currentPosition,
+                    syncedLyricsText = if (isShowingSynchronizedLyrics) text else null,
                     onDismiss = { isLyricsShareMode = false }
                 )
             }
