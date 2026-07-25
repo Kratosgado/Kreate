@@ -878,7 +878,6 @@ fun Lyrics(
                     thumbnailUrl = mediaMetadata.artworkUri?.toString(),
                     mediaId = mediaId,
                     currentPosition = player.currentPosition,
-                    syncedLyricsText = if (isShowingSynchronizedLyrics) text else null,
                     onDismiss = { isLyricsShareMode = false }
                 )
             }
@@ -2368,7 +2367,7 @@ fun Lyrics(
 
                                         MenuEntry(
                                             icon = R.drawable.share_social,
-                                            text = stringResource(R.string.lyrics_share),
+                                            text = stringResource(R.string.lyrics_share_as_image),
                                             onClick = {
                                                 menuState.hide()
                                                 isLyricsShareMode = true

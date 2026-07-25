@@ -70,7 +70,6 @@ private val logger = Logger.withTag("LyricsShareCard")
 /**
  * Composable that provides a lyrics selection interface.
  * Users can tap individual lines to select/deselect them.
- * Supports sharing as image card or video with audio.
  *
  * @param lyrics List of lyric lines to display for selection
  * @param songTitle The title of the current song
@@ -78,7 +77,6 @@ private val logger = Logger.withTag("LyricsShareCard")
  * @param thumbnailUrl URL of the song thumbnail/album art
  * @param mediaId The song's media ID (used for YouTube link)
  * @param currentPosition Current playback position in milliseconds
- * @param syncedLyricsText Raw LRC text with timestamps (null if lyrics aren't synced)
  * @param onDismiss Callback when selection mode is dismissed
  */
 @Composable
@@ -89,61 +87,56 @@ fun LyricsSelectionMode(
     thumbnailUrl: String?,
     mediaId: String,
     currentPosition: Long,
-    syncedLyricsText: String? = null,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val selectedIndices = remember { mutableStateListOf<Int>() }
     var isGenerating by remember { mutableStateOf(false) }
-    // 0 = Image, 1 = Video (static), 2 = Animated Video
-    var shareMode by remember { mutableStateOf(0) }
-
-    // Parse timestamps from synced lyrics for video mode
-    val lyricsWithTimestamps: List<Pair<Long, String>> = remember(syncedLyricsText) {
-        if (syncedLyricsText == null) emptyList()
-        else it.fast4x.lrclib.LrcLib.Lyrics(syncedLyricsText).sentences
-    }
-    val isSyncAvailable = lyricsWithTimestamps.isNotEmpty()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         // Header with instructions and action buttons
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             BasicText(
                 text = stringResource(R.string.lyrics_share_select_lines),
-                style = typography().xs.copy(
-                    color = ComposeColor.White,
-                    fontWeight = FontWeight.Bold
-                )
+                style =
+                    typography().xs.copy(
+                        color = ComposeColor.White,
+                        fontWeight = FontWeight.Bold,
+                    ),
             )
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Cancel button
                 Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(ComposeColor.White.copy(alpha = 0.2f))
-                        .clickable { onDismiss() }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(ComposeColor.White.copy(alpha = 0.2f))
+                            .clickable { onDismiss() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                 ) {
                     BasicText(
                         text = stringResource(R.string.cancel),
-                        style = typography().xxs.copy(
-                            color = ComposeColor.White
-                        )
+                        style =
+                            typography().xxs.copy(
+                                color = ComposeColor.White,
+                            ),
                     )
                 }
 
@@ -151,31 +144,20 @@ fun LyricsSelectionMode(
                 AnimatedVisibility(
                     visible = selectedIndices.isNotEmpty(),
                     enter = fadeIn() + slideInVertically(),
-                    exit = fadeOut() + slideOutVertically()
+                    exit = fadeOut() + slideOutVertically(),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(colorPalette().accent)
-                            .clickable(enabled = !isGenerating) {
-                                coroutineScope.launch {
-                                    isGenerating = true
-                                    val sortedIndices = selectedIndices.sorted()
-                                    val selectedLines = sortedIndices.map { lyrics[it] }
-
-                                    if (shareMode != 0 && isSyncAvailable) {
-                                        generateAndShareLyricsVideo(
-                                            context = context,
-                                            selectedLyrics = selectedLines,
-                                            songTitle = songTitle,
-                                            artistName = artistName,
-                                            thumbnailUrl = thumbnailUrl,
-                                            mediaId = mediaId,
-                                            lyricsWithTimestamps = lyricsWithTimestamps,
-                                            selectedIndices = sortedIndices,
-                                            animated = shareMode == 2
-                                        )
-                                    } else {
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(colorPalette().accent)
+                                .clickable(enabled = !isGenerating) {
+                                    coroutineScope.launch {
+                                        isGenerating = true
+                                        val selectedLines =
+                                            selectedIndices
+                                                .sorted()
+                                                .map { lyrics[it] }
                                         generateAndShareLyricsCard(
                                             context = context,
                                             selectedLyrics = selectedLines,
@@ -183,31 +165,27 @@ fun LyricsSelectionMode(
                                             artistName = artistName,
                                             thumbnailUrl = thumbnailUrl,
                                             mediaId = mediaId,
-                                            currentPosition = currentPosition
+                                            currentPosition = currentPosition,
                                         )
+                                        isGenerating = false
+                                        onDismiss()
                                     }
-                                    isGenerating = false
-                                    onDismiss()
-                                }
-                            }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                }.padding(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         if (isGenerating) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(14.dp),
                                 color = ComposeColor.White,
-                                strokeWidth = 2.dp
+                                strokeWidth = 2.dp,
                             )
                         } else {
                             BasicText(
-                                text = when (shareMode) {
-                                    0 -> stringResource(R.string.lyrics_share_create_card)
-                                    else -> stringResource(R.string.lyrics_share_create_video)
-                                },
-                                style = typography().xxs.copy(
-                                    color = ComposeColor.White,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                text = stringResource(R.string.lyrics_share_create_card),
+                                style =
+                                    typography().xxs.copy(
+                                        color = ComposeColor.White,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
                             )
                         }
                     }
@@ -215,131 +193,75 @@ fun LyricsSelectionMode(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Image / Video / Animated toggle (only show if synced lyrics available)
-        if (isSyncAvailable) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Image mode pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (shareMode == 0) colorPalette().accent.copy(alpha = 0.8f)
-                            else ComposeColor.White.copy(alpha = 0.1f)
-                        )
-                        .clickable { shareMode = 0 }
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                ) {
-                    BasicText(
-                        text = "📷 ${stringResource(R.string.lyrics_share_mode_image)}",
-                        style = typography().xxs.copy(
-                            color = ComposeColor.White,
-                            fontWeight = if (shareMode == 0) FontWeight.Bold else FontWeight.Normal
-                        )
-                    )
-                }
-                // Video (static) mode pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (shareMode == 1) colorPalette().accent.copy(alpha = 0.8f)
-                            else ComposeColor.White.copy(alpha = 0.1f)
-                        )
-                        .clickable { shareMode = 1 }
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                ) {
-                    BasicText(
-                        text = "🎬 ${stringResource(R.string.lyrics_share_mode_video)}",
-                        style = typography().xxs.copy(
-                            color = ComposeColor.White,
-                            fontWeight = if (shareMode == 1) FontWeight.Bold else FontWeight.Normal
-                        )
-                    )
-                }
-                // Animated video mode pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (shareMode == 2) colorPalette().accent.copy(alpha = 0.8f)
-                            else ComposeColor.White.copy(alpha = 0.1f)
-                        )
-                        .clickable { shareMode = 2 }
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                ) {
-                    BasicText(
-                        text = "✨ ${stringResource(R.string.lyrics_share_mode_animated)}",
-                        style = typography().xxs.copy(
-                            color = ComposeColor.White,
-                            fontWeight = if (shareMode == 2) FontWeight.Bold else FontWeight.Normal
-                        )
-                    )
-                }
-            }
-        }
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Selected count indicator
         if (selectedIndices.isNotEmpty()) {
             BasicText(
                 text = "${selectedIndices.size} line${if (selectedIndices.size > 1) "s" else ""} selected",
-                style = typography().xxs.copy(
-                    color = colorPalette().accent
-                ),
-                modifier = Modifier.padding(bottom = 8.dp)
+                style =
+                    typography().xxs.copy(
+                        color = colorPalette().accent,
+                    ),
+                modifier = Modifier.padding(bottom = 8.dp),
             )
         }
 
         // Lyrics selection list
         LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             itemsIndexed(lyrics) { index, line ->
                 if (line.isBlank()) return@itemsIndexed
 
                 val isSelected = index in selectedIndices
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (isSelected) colorPalette().accent.copy(alpha = 0.3f)
-                            else ComposeColor.White.copy(alpha = 0.05f)
-                        )
-                        .then(
-                            if (isSelected) Modifier.border(
-                                width = 1.dp,
-                                color = colorPalette().accent,
-                                shape = RoundedCornerShape(8.dp)
-                            ) else Modifier
-                        )
-                        .clickable {
-                            if (isSelected) {
-                                selectedIndices.remove(index)
-                            } else {
-                                selectedIndices.add(index)
-                            }
-                        }
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isSelected) {
+                                    colorPalette().accent.copy(alpha = 0.3f)
+                                } else {
+                                    ComposeColor.White.copy(alpha = 0.05f)
+                                },
+                            ).then(
+                                if (isSelected) {
+                                    Modifier.border(
+                                        width = 1.dp,
+                                        color = colorPalette().accent,
+                                        shape = RoundedCornerShape(8.dp),
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            ).clickable {
+                                if (isSelected) {
+                                    selectedIndices.remove(index)
+                                } else {
+                                    selectedIndices.add(index)
+                                }
+                            }.padding(horizontal = 12.dp, vertical = 10.dp),
                 ) {
                     BasicText(
                         text = line,
-                        style = typography().s.copy(
-                            color = if (isSelected) ComposeColor.White
-                            else ComposeColor.White.copy(alpha = 0.7f),
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            textAlign = TextAlign.Center
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        style =
+                            typography().s.copy(
+                                color =
+                                    if (isSelected) {
+                                        ComposeColor.White
+                                    } else {
+                                        ComposeColor.White.copy(alpha = 0.7f)
+                                    },
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                textAlign = TextAlign.Center,
+                            ),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -365,17 +287,18 @@ suspend fun generateAndShareLyricsCard(
     artistName: String,
     thumbnailUrl: String?,
     mediaId: String,
-    currentPosition: Long
+    currentPosition: Long,
 ) {
     withContext(Dispatchers.IO) {
         try {
-            val cardBitmap = createLyricsCardBitmap(
-                context = context,
-                lyrics = selectedLyrics,
-                songTitle = songTitle,
-                artistName = artistName,
-                thumbnailUrl = thumbnailUrl
-            )
+            val cardBitmap =
+                createLyricsCardBitmap(
+                    context = context,
+                    lyrics = selectedLyrics,
+                    songTitle = songTitle,
+                    artistName = artistName,
+                    thumbnailUrl = thumbnailUrl,
+                )
 
             // Save the bitmap to a temp file
             val shareDir = File(context.cacheDir, "shared_lyrics")
@@ -386,212 +309,41 @@ suspend fun generateAndShareLyricsCard(
             }
 
             // Get content URI via FileProvider
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                imageFile
-            )
+            val uri =
+                FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    imageFile,
+                )
 
             // Build share text with optional music link
-            val shareText = buildString {
-                append("\"${selectedLyrics.joinToString("\n")}\"")
-                append("\n\n— $songTitle by $artistName")
-                append("\n\n🎵 https://music.youtube.com/watch?v=$mediaId")
-                if (currentPosition > 0) {
-                    val seconds = (currentPosition / 1000).toInt()
-                    append("&t=${seconds}s")
+            val shareText =
+                buildString {
+                    append("\"${selectedLyrics.joinToString("\n")}\"")
+                    append("\n\n— $songTitle by $artistName")
+                    append("\n\n🎵 https://music.youtube.com/watch?v=$mediaId")
+                    if (currentPosition > 0) {
+                        val seconds = (currentPosition / 1000).toInt()
+                        append("&t=${seconds}s")
+                    }
                 }
-            }
 
             // Launch share intent
             withContext(Dispatchers.Main) {
-                val shareIntent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    type = "image/png"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TEXT, shareText)
-                    clipData = android.content.ClipData.newRawUri(null, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(Intent.createChooser(shareIntent, null))
+                val shareIntent =
+                    Intent().apply {
+                        action = Intent.ACTION_SEND
+                        type = "image/png"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_TEXT, shareText)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                context.startActivity(
+                    Intent.createChooser(shareIntent, null),
+                )
             }
         } catch (e: Exception) {
             logger.e(e) { "Failed to generate/share lyrics card" }
-        }
-    }
-}
-
-/**
- * Generates a lyrics video (MP4) with audio from the song and shares it.
- *
- * Uses the synced lyrics timestamps to determine the audio segment,
- * renders the lyrics card as a static video frame, and muxes with the audio.
- */
-suspend fun generateAndShareLyricsVideo(
-    context: Context,
-    selectedLyrics: List<String>,
-    songTitle: String,
-    artistName: String,
-    thumbnailUrl: String?,
-    mediaId: String,
-    lyricsWithTimestamps: List<Pair<Long, String>>,
-    selectedIndices: List<Int>,
-    animated: Boolean = true
-) {
-    withContext(Dispatchers.IO) {
-        try {
-            // Determine audio start/end from synced lyrics timestamps.
-            // lyricsWithTimestamps includes the initial (0, "") entry at index 0.
-            // Parsed plain lyrics (without blanks) correspond to entries starting at index 1.
-            val firstSelectedIdx = selectedIndices.first()
-            val lastSelectedIdx = selectedIndices.last()
-
-            val startTimestampIdx = (firstSelectedIdx + 1).coerceIn(0, lyricsWithTimestamps.lastIndex)
-            val endTimestampIdx = (lastSelectedIdx + 2).coerceIn(0, lyricsWithTimestamps.lastIndex)
-
-            val startMs = lyricsWithTimestamps[startTimestampIdx].first
-            val endMs = if (endTimestampIdx <= lyricsWithTimestamps.lastIndex) {
-                lyricsWithTimestamps[endTimestampIdx].first
-            } else {
-                // Last line: add 5 seconds after it starts
-                lyricsWithTimestamps.last().first + 5000L
-            }
-
-            if (endMs <= startMs) {
-                logger.e { "Invalid time range: start=$startMs, end=$endMs" }
-                return@withContext
-            }
-
-            // Extract audio segment from cache
-            val cache: androidx.media3.datasource.cache.Cache by org.koin.java.KoinJavaComponent.inject(
-                androidx.media3.datasource.cache.Cache::class.java, app.kreate.di.CacheType.CACHE
-            )
-            val downloadCache: androidx.media3.datasource.cache.Cache by org.koin.java.KoinJavaComponent.inject(
-                androidx.media3.datasource.cache.Cache::class.java, app.kreate.di.CacheType.DOWNLOAD
-            )
-
-            val audioFile = app.kreate.android.screens.player.share.extractAudioSegment(
-                context = context,
-                songId = mediaId,
-                cache = cache,
-                downloadCache = downloadCache,
-                startMs = startMs,
-                endMs = endMs
-            )
-
-            if (audioFile == null) {
-                logger.e { "Failed to extract audio segment. Song may not be cached." }
-                // Fall back to image share
-                generateAndShareLyricsCard(
-                    context, selectedLyrics, songTitle, artistName,
-                    thumbnailUrl, mediaId, startMs
-                )
-                return@withContext
-            }
-
-            // Load album art
-            val albumArt = thumbnailUrl?.let {
-                try {
-                    val hiResUrl = it.replace(Regex("=w\\d+-h\\d+"), "=w800-h800")
-                    app.kreate.android.coil3.ImageFactory.bitmap(hiResUrl).getOrNull()?.let { bmp ->
-                        bmp.copy(Bitmap.Config.ARGB_8888, true)
-                    }
-                } catch (e: Exception) {
-                    null
-                }
-            }
-
-            // Encode video
-            val shareDir = File(context.cacheDir, "shared_lyrics")
-            shareDir.mkdirs()
-            val videoFile = File(shareDir, "lyrics_video_${System.currentTimeMillis()}.mp4")
-            val durationMs = endMs - startMs
-
-            val success = if (animated) {
-                // Build per-line timestamps for the selected lyrics
-                val selectedTimestamps = selectedIndices.map { idx ->
-                    val tsIdx = (idx + 1).coerceIn(0, lyricsWithTimestamps.lastIndex)
-                    lyricsWithTimestamps[tsIdx].first
-                }
-
-                // Animated: karaoke-style highlighting at 15fps
-                val frameRenderer = app.kreate.android.screens.player.share.LyricsFrameRenderer(
-                    context = context,
-                    lyrics = selectedLyrics,
-                    lyricsTimestamps = selectedTimestamps,
-                    songTitle = songTitle,
-                    artistName = artistName,
-                    startMs = startMs,
-                    albumArt = albumArt
-                )
-
-                val result = app.kreate.android.screens.player.share.encodeLyricsVideo(
-                    frameRenderer = frameRenderer,
-                    audioFile = audioFile,
-                    outputFile = videoFile,
-                    durationMs = durationMs
-                )
-                frameRenderer.release()
-                result
-            } else {
-                // Static: single card image as video
-                val cardBitmap = createLyricsCardBitmap(
-                    context = context,
-                    lyrics = selectedLyrics,
-                    songTitle = songTitle,
-                    artistName = artistName,
-                    thumbnailUrl = thumbnailUrl
-                )
-                app.kreate.android.screens.player.share.encodeLyricsVideo(
-                    cardBitmap = cardBitmap,
-                    audioFile = audioFile,
-                    outputFile = videoFile,
-                    durationMs = durationMs
-                )
-            }
-
-            albumArt?.recycle()
-
-            // Clean up audio temp file
-            audioFile.delete()
-
-            if (!success) {
-                logger.e { "Video encoding failed, falling back to image share" }
-                generateAndShareLyricsCard(
-                    context, selectedLyrics, songTitle, artistName,
-                    thumbnailUrl, mediaId, startMs
-                )
-                return@withContext
-            }
-
-            // Share the video
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                videoFile
-            )
-
-            val shareText = buildString {
-                append("\"${selectedLyrics.joinToString("\n")}\"")
-                append("\n\n— $songTitle by $artistName")
-                append("\n\n🎵 https://music.youtube.com/watch?v=$mediaId")
-                val seconds = (startMs / 1000).toInt()
-                if (seconds > 0) append("&t=${seconds}s")
-            }
-
-            withContext(Dispatchers.Main) {
-                val shareIntent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    type = "video/mp4"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_TEXT, shareText)
-                    clipData = android.content.ClipData.newRawUri(null, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(Intent.createChooser(shareIntent, null))
-            }
-        } catch (e: Exception) {
-            logger.e(e) { "Failed to generate/share lyrics video" }
         }
     }
 }
@@ -609,55 +361,63 @@ private suspend fun createLyricsCardBitmap(
     lyrics: List<String>,
     songTitle: String,
     artistName: String,
-    thumbnailUrl: String?
+    thumbnailUrl: String?,
 ): Bitmap {
     val cardWidth = 1080
     val padding = 80f
-    val topBarHeight = 100f      // space for app icon row
-    val bottomInfoHeight = 140f  // space for album art + song info row
+    val topBarHeight = 100f // space for app icon row
+    val bottomInfoHeight = 140f // space for album art + song info row
     val bottomPadding = 80f
 
     // Measure lyrics text height to calculate dynamic card height
-    val lyricsPaint = TextPaint().apply {
-        color = Color.WHITE
-        textSize = 58f
-        isAntiAlias = true
-        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-        textAlign = Paint.Align.CENTER
-        letterSpacing = 0.01f
-    }
+    val lyricsPaint =
+        TextPaint().apply {
+            color = Color.WHITE
+            textSize = 58f
+            isAntiAlias = true
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+            letterSpacing = 0.01f
+        }
     val lyricsText = lyrics.joinToString("\n")
     val textWidth = (cardWidth - padding * 2).toInt()
-    val lyricsLayout = StaticLayout.Builder
-        .obtain(lyricsText, 0, lyricsText.length, lyricsPaint, textWidth)
-        .setAlignment(Layout.Alignment.ALIGN_CENTER)
-        .setLineSpacing(24f, 1.3f)
-        .setIncludePad(true)
-        .build()
+    val lyricsLayout =
+        StaticLayout.Builder
+            .obtain(lyricsText, 0, lyricsText.length, lyricsPaint, textWidth)
+            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+            .setLineSpacing(24f, 1.3f)
+            .setIncludePad(true)
+            .build()
     val lyricsHeight = lyricsLayout.height.toFloat()
 
     // Calculate total card height: padding + top bar + gap + lyrics + gap + bottom info + padding
-    val cardHeight = (padding + topBarHeight + 60f + lyricsHeight + 80f
-            + bottomInfoHeight + bottomPadding).toInt()
-        .coerceIn(800, 1920)
+    val cardHeight =
+        (
+            padding + topBarHeight + 60f + lyricsHeight + 80f +
+                bottomInfoHeight + bottomPadding
+        ).toInt()
+            .coerceIn(800, 1920)
 
     val bitmap = Bitmap.createBitmap(cardWidth, cardHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
     // Load album art once and reuse
-    val albumArt = thumbnailUrl?.let {
-        try {
-            val hiResUrl = it.replace(Regex("=w\\d+-h\\d+"), "=w800-h800")
-            ImageFactory.bitmap(hiResUrl).getOrNull()?.let { bmp ->
-                // Always copy to a mutable software bitmap.
-                // Don't recycle the original — Coil's memory cache owns it.
-                bmp.copy(Bitmap.Config.ARGB_8888, true)
+    val albumArt =
+        thumbnailUrl?.let {
+            try {
+                val hiResUrl = it.replace(Regex("=w\\d+-h\\d+"), "=w800-h800")
+                ImageFactory.bitmap(hiResUrl).getOrNull()?.let { bmp ->
+                    if (bmp.config == Bitmap.Config.HARDWARE) {
+                        bmp.copy(Bitmap.Config.ARGB_8888, true).also { bmp.recycle() }
+                    } else {
+                        bmp
+                    }
+                }
+            } catch (e: Exception) {
+                logger.w(e) { "Failed to load thumbnail for lyrics card" }
+                null
             }
-        } catch (e: Exception) {
-            logger.w(e) { "Failed to load thumbnail for lyrics card" }
-            null
         }
-    }
 
     // 1. Draw full-bleed blurred background
     drawBackground(canvas, cardWidth, cardHeight, albumArt)
@@ -682,71 +442,91 @@ private suspend fun drawBackground(
     canvas: Canvas,
     width: Int,
     height: Int,
-    albumArt: Bitmap?
+    albumArt: Bitmap?,
 ) {
     if (albumArt != null) {
         // Scale album art to cover the entire card (center-crop)
         val srcRatio = albumArt.width.toFloat() / albumArt.height.toFloat()
         val dstRatio = width.toFloat() / height.toFloat()
 
-        val scaled = if (srcRatio > dstRatio) {
-            // Source is wider — fit height, crop width
-            val scaledWidth = (height * srcRatio).toInt()
-            Bitmap.createScaledBitmap(albumArt, scaledWidth, height, true)
-        } else {
-            // Source is taller — fit width, crop height
-            val scaledHeight = (width / srcRatio).toInt()
-            Bitmap.createScaledBitmap(albumArt, width, scaledHeight, true)
-        }
+        val scaled =
+            if (srcRatio > dstRatio) {
+                // Source is wider — fit height, crop width
+                val scaledWidth = (height * srcRatio).toInt()
+                Bitmap.createScaledBitmap(albumArt, scaledWidth, height, true)
+            } else {
+                // Source is taller — fit width, crop height
+                val scaledHeight = (width / srcRatio).toInt()
+                Bitmap.createScaledBitmap(albumArt, width, scaledHeight, true)
+            }
 
         // Center crop
         val cropX = ((scaled.width - width) / 2).coerceAtLeast(0)
         val cropY = ((scaled.height - height) / 2).coerceAtLeast(0)
-        val cropped = Bitmap.createBitmap(
-            scaled, cropX, cropY,
-            width.coerceAtMost(scaled.width - cropX),
-            height.coerceAtMost(scaled.height - cropY)
-        )
+        val cropped =
+            Bitmap.createBitmap(
+                scaled,
+                cropX,
+                cropY,
+                width.coerceAtMost(scaled.width - cropX),
+                height.coerceAtMost(scaled.height - cropY),
+            )
 
         // Heavy blur for background
         val blurred = cropped.blur(0.5f, 25)
         canvas.drawBitmap(
             Bitmap.createScaledBitmap(blurred, width, height, true),
-            0f, 0f, null
+            0f,
+            0f,
+            null,
         )
         blurred.recycle()
         if (cropped !== scaled) cropped.recycle()
         scaled.recycle()
     } else {
         // Fallback: rich dark gradient
-        val bgPaint = Paint().apply {
-            shader = LinearGradient(
-                0f, 0f, width.toFloat(), height.toFloat(),
-                Color.parseColor("#0f0c29"),
-                Color.parseColor("#302b63"),
-                Shader.TileMode.CLAMP
-            )
-        }
+        val bgPaint =
+            Paint().apply {
+                shader =
+                    LinearGradient(
+                        0f,
+                        0f,
+                        width.toFloat(),
+                        height.toFloat(),
+                        Color.parseColor("#0f0c29"),
+                        Color.parseColor("#302b63"),
+                        Shader.TileMode.CLAMP,
+                    )
+            }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
     }
 }
 
-private fun drawGradientOverlay(canvas: Canvas, width: Int, height: Int) {
+private fun drawGradientOverlay(
+    canvas: Canvas,
+    width: Int,
+    height: Int,
+) {
     // Strong vignette-like overlay: dark at top and bottom, slightly lighter in the middle
-    val overlayPaint = Paint().apply {
-        shader = LinearGradient(
-            0f, 0f, 0f, height.toFloat(),
-            intArrayOf(
-                Color.argb(200, 0, 0, 0),   // top: very dark
-                Color.argb(120, 0, 0, 0),   // upper middle
-                Color.argb(100, 0, 0, 0),   // center
-                Color.argb(140, 0, 0, 0),   // lower middle
-                Color.argb(230, 0, 0, 0)    // bottom: very dark
-            ),
-            floatArrayOf(0f, 0.25f, 0.45f, 0.7f, 1f),
-            Shader.TileMode.CLAMP
-        )
-    }
+    val overlayPaint =
+        Paint().apply {
+            shader =
+                LinearGradient(
+                    0f,
+                    0f,
+                    0f,
+                    height.toFloat(),
+                    intArrayOf(
+                        Color.argb(200, 0, 0, 0), // top: very dark
+                        Color.argb(120, 0, 0, 0), // upper middle
+                        Color.argb(100, 0, 0, 0), // center
+                        Color.argb(140, 0, 0, 0), // lower middle
+                        Color.argb(230, 0, 0, 0), // bottom: very dark
+                    ),
+                    floatArrayOf(0f, 0.25f, 0.45f, 0.7f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+        }
     canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
 }
 
@@ -756,7 +536,7 @@ private fun drawGradientOverlay(canvas: Canvas, width: Int, height: Int) {
 private fun drawAppIcon(
     context: Context,
     canvas: Canvas,
-    padding: Float
+    padding: Float,
 ) {
     val iconSize = 72f
     val iconTop = padding
@@ -770,14 +550,15 @@ private fun drawAppIcon(
         iconDrawable.draw(iconCanvas)
 
         // Draw with circular clipping
-        val path = android.graphics.Path().apply {
-            addCircle(
-                iconLeft + iconSize / 2f,
-                iconTop + iconSize / 2f,
-                iconSize / 2f,
-                android.graphics.Path.Direction.CW
-            )
-        }
+        val path =
+            android.graphics.Path().apply {
+                addCircle(
+                    iconLeft + iconSize / 2f,
+                    iconTop + iconSize / 2f,
+                    iconSize / 2f,
+                    android.graphics.Path.Direction.CW,
+                )
+            }
         canvas.save()
         canvas.clipPath(path)
         canvas.drawBitmap(iconBitmap, iconLeft, iconTop, null)
@@ -785,19 +566,21 @@ private fun drawAppIcon(
         iconBitmap.recycle()
     } catch (e: Exception) {
         // Fallback: draw a simple circle with "K"
-        val circlePaint = Paint().apply {
-            color = Color.argb(80, 255, 255, 255)
-            isAntiAlias = true
-        }
+        val circlePaint =
+            Paint().apply {
+                color = Color.argb(80, 255, 255, 255)
+                isAntiAlias = true
+            }
         canvas.drawCircle(iconLeft + iconSize / 2f, iconTop + iconSize / 2f, iconSize / 2f, circlePaint)
 
-        val textPaint = TextPaint().apply {
-            color = Color.WHITE
-            textSize = 36f
-            isAntiAlias = true
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-        }
+        val textPaint =
+            TextPaint().apply {
+                color = Color.WHITE
+                textSize = 36f
+                isAntiAlias = true
+                textAlign = Paint.Align.CENTER
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            }
         canvas.drawText("K", iconLeft + iconSize / 2f, iconTop + iconSize / 2f + 12f, textPaint)
     }
 }
@@ -807,16 +590,17 @@ private fun drawLyricsText(
     lyricsLayout: StaticLayout,
     width: Int,
     startY: Float,
-    padding: Float
+    padding: Float,
 ) {
     // Draw a subtle quote decoration
-    val quotePaint = TextPaint().apply {
-        color = Color.argb(40, 255, 255, 255)
-        textSize = 140f
-        isAntiAlias = true
-        typeface = Typeface.create("serif", Typeface.ITALIC)
-        textAlign = Paint.Align.LEFT
-    }
+    val quotePaint =
+        TextPaint().apply {
+            color = Color.argb(40, 255, 255, 255)
+            textSize = 140f
+            isAntiAlias = true
+            typeface = Typeface.create("serif", Typeface.ITALIC)
+            textAlign = Paint.Align.LEFT
+        }
     canvas.drawText("\u201C", padding - 20f, startY + 70f, quotePaint)
 
     canvas.save()
@@ -835,11 +619,11 @@ private fun drawSongInfoRow(
     albumArt: Bitmap?,
     width: Int,
     height: Int,
-    padding: Float
+    padding: Float,
 ) {
     val thumbSize = 96f
     val cornerRadius = 16f
-    val rowY = height - padding - thumbSize  // vertically position the row
+    val rowY = height - padding - thumbSize // vertically position the row
     val thumbLeft = padding
     val textLeft = thumbLeft + thumbSize + 24f
 
@@ -847,13 +631,15 @@ private fun drawSongInfoRow(
     if (albumArt != null) {
         val scaledArt = Bitmap.createScaledBitmap(albumArt, thumbSize.toInt(), thumbSize.toInt(), true)
 
-        val path = android.graphics.Path().apply {
-            addRoundRect(
-                RectF(thumbLeft, rowY, thumbLeft + thumbSize, rowY + thumbSize),
-                cornerRadius, cornerRadius,
-                android.graphics.Path.Direction.CW
-            )
-        }
+        val path =
+            android.graphics.Path().apply {
+                addRoundRect(
+                    RectF(thumbLeft, rowY, thumbLeft + thumbSize, rowY + thumbSize),
+                    cornerRadius,
+                    cornerRadius,
+                    android.graphics.Path.Direction.CW,
+                )
+            }
         canvas.save()
         canvas.clipPath(path)
         canvas.drawBitmap(scaledArt, thumbLeft, rowY, null)
@@ -861,64 +647,76 @@ private fun drawSongInfoRow(
         scaledArt.recycle()
 
         // Subtle border
-        val borderPaint = Paint().apply {
-            style = Paint.Style.STROKE
-            color = Color.argb(50, 255, 255, 255)
-            strokeWidth = 2f
-            isAntiAlias = true
-        }
+        val borderPaint =
+            Paint().apply {
+                style = Paint.Style.STROKE
+                color = Color.argb(50, 255, 255, 255)
+                strokeWidth = 2f
+                isAntiAlias = true
+            }
         canvas.drawRoundRect(
             RectF(thumbLeft, rowY, thumbLeft + thumbSize, rowY + thumbSize),
-            cornerRadius, cornerRadius, borderPaint
+            cornerRadius,
+            cornerRadius,
+            borderPaint,
         )
     } else {
         // Placeholder
-        val placeholderPaint = Paint().apply {
-            color = Color.argb(40, 255, 255, 255)
-            isAntiAlias = true
-        }
+        val placeholderPaint =
+            Paint().apply {
+                color = Color.argb(40, 255, 255, 255)
+                isAntiAlias = true
+            }
         canvas.drawRoundRect(
             RectF(thumbLeft, rowY, thumbLeft + thumbSize, rowY + thumbSize),
-            cornerRadius, cornerRadius, placeholderPaint
+            cornerRadius,
+            cornerRadius,
+            placeholderPaint,
         )
-        val notePaint = TextPaint().apply {
-            color = Color.argb(100, 255, 255, 255)
-            textSize = 40f
-            isAntiAlias = true
-            textAlign = Paint.Align.CENTER
-        }
+        val notePaint =
+            TextPaint().apply {
+                color = Color.argb(100, 255, 255, 255)
+                textSize = 40f
+                isAntiAlias = true
+                textAlign = Paint.Align.CENTER
+            }
         canvas.drawText("♪", thumbLeft + thumbSize / 2f, rowY + thumbSize / 2f + 14f, notePaint)
     }
 
     // Song title (to the right of thumbnail, vertically centered)
-    val titlePaint = TextPaint().apply {
-        color = Color.WHITE
-        textSize = 38f
-        isAntiAlias = true
-        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-        textAlign = Paint.Align.LEFT
-    }
+    val titlePaint =
+        TextPaint().apply {
+            color = Color.WHITE
+            textSize = 38f
+            isAntiAlias = true
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            textAlign = Paint.Align.LEFT
+        }
 
     val maxTextWidth = width - textLeft - padding
-    val displayTitle = if (titlePaint.measureText(songTitle) > maxTextWidth) {
-        var truncated = songTitle
-        while (titlePaint.measureText("$truncated…") > maxTextWidth && truncated.isNotEmpty()) {
-            truncated = truncated.dropLast(1)
+    val displayTitle =
+        if (titlePaint.measureText(songTitle) > maxTextWidth) {
+            var truncated = songTitle
+            while (titlePaint.measureText("$truncated…") > maxTextWidth && truncated.isNotEmpty()) {
+                truncated = truncated.dropLast(1)
+            }
+            "$truncated…"
+        } else {
+            songTitle
         }
-        "$truncated…"
-    } else songTitle
 
     val titleY = rowY + thumbSize / 2f - 8f
     canvas.drawText(displayTitle, textLeft, titleY, titlePaint)
 
     // Artist name (below title)
-    val artistPaint = TextPaint().apply {
-        color = Color.argb(160, 255, 255, 255)
-        textSize = 32f
-        isAntiAlias = true
-        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-        textAlign = Paint.Align.LEFT
-    }
+    val artistPaint =
+        TextPaint().apply {
+            color = Color.argb(160, 255, 255, 255)
+            textSize = 32f
+            isAntiAlias = true
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            textAlign = Paint.Align.LEFT
+        }
     canvas.drawText(artistName, textLeft, titleY + 42f, artistPaint)
 }
 
@@ -926,11 +724,15 @@ private fun drawSongInfoRow(
  * Parses synced lyrics text (LRC format) into a list of plain text lines.
  * Removes timestamps like [00:12.34] from each line.
  */
-fun parseLyricsToLines(text: String?, isSynced: Boolean): List<String> {
+fun parseLyricsToLines(
+    text: String?,
+    isSynced: Boolean,
+): List<String> {
     if (text.isNullOrBlank()) return emptyList()
 
     return if (isSynced) {
-        text.lines()
+        text
+            .lines()
             .map { line -> line.replace(Regex("\\[\\d{2}:\\d{2}\\.\\d{2,3}]"), "").trim() }
             .filter { it.isNotBlank() }
     } else {
