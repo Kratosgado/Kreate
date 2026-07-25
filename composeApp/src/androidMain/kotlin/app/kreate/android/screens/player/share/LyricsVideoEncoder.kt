@@ -23,17 +23,63 @@ import java.nio.ByteOrder
 private val logger = Logger.withTag("LyricsVideoEncoder")
 
 private const val VIDEO_MIME_TYPE = MediaFormat.MIMETYPE_VIDEO_AVC
-private const val FRAME_RATE = 1  // 1 fps — static image
-private const val I_FRAME_INTERVAL = 1
-private const val VIDEO_BITRATE = 2_000_000  // 2 Mbps
+private const val FRAME_RATE = 15  // 15fps — smooth enough for text animation, keeps file size down
+private const val I_FRAME_INTERVAL = 2
+private const val VIDEO_BITRATE = 1_000_000  // 1 Mbps — sufficient for text over blurred image
 private const val CODEC_TIMEOUT_US = 10_000L
 
 /**
- * Encodes a static lyrics card bitmap + audio segment into an MP4 video file.
+ * Encodes an animated lyrics video with audio into an MP4.
+ *
+ * Uses [LyricsFrameRenderer] to generate per-frame bitmaps with the active
+ * lyric line highlighted (karaoke-style). Renders at 15fps.
  *
  * Strategy: Encode video frames first into a temp file, then mux video + audio
- * together in a second pass. This avoids the "muxer already started" issue
- * since MediaMuxer requires all tracks added before start().
+ * together in a second pass.
+ */
+suspend fun encodeLyricsVideo(
+    frameRenderer: LyricsFrameRenderer,
+    audioFile: File,
+    outputFile: File,
+    durationMs: Long
+): Boolean = withContext(Dispatchers.IO) {
+    try {
+        outputFile.parentFile?.mkdirs()
+
+        val width = frameRenderer.width
+        val height = frameRenderer.height
+
+        // Ensure dimensions are even (required by H.264)
+        val encoderWidth = if (width % 2 == 0) width else width + 1
+        val encoderHeight = if (height % 2 == 0) height else height + 1
+
+        // Step 1: Encode animated video frames to a temp file
+        val tempVideoFile = File(outputFile.parent, "temp_video_${System.currentTimeMillis()}.mp4")
+        val videoSuccess = encodeVideoFrames(
+            frameRenderer, tempVideoFile, encoderWidth, encoderHeight, durationMs
+        )
+        if (!videoSuccess) {
+            tempVideoFile.delete()
+            return@withContext false
+        }
+
+        // Step 2: Mux video + audio into the final output
+        val muxSuccess = muxVideoAndAudio(tempVideoFile, audioFile, outputFile)
+        tempVideoFile.delete()
+
+        if (muxSuccess) {
+            logger.i { "Animated lyrics video encoded: ${outputFile.absolutePath}" }
+        }
+        muxSuccess
+    } catch (e: Exception) {
+        logger.e(e) { "Failed to encode lyrics video" }
+        outputFile.delete()
+        false
+    }
+}
+
+/**
+ * Overload that accepts a static bitmap (backwards compatible with non-animated usage).
  */
 suspend fun encodeLyricsVideo(
     cardBitmap: Bitmap,
@@ -46,25 +92,21 @@ suspend fun encodeLyricsVideo(
 
         val width = cardBitmap.width
         val height = cardBitmap.height
-
-        // Ensure dimensions are even (required by H.264)
         val encoderWidth = if (width % 2 == 0) width else width + 1
         val encoderHeight = if (height % 2 == 0) height else height + 1
 
-        // Step 1: Encode video to a temp file
         val tempVideoFile = File(outputFile.parent, "temp_video_${System.currentTimeMillis()}.mp4")
-        val videoSuccess = encodeVideoOnly(cardBitmap, tempVideoFile, encoderWidth, encoderHeight, durationMs)
+        val videoSuccess = encodeStaticVideo(cardBitmap, tempVideoFile, encoderWidth, encoderHeight, durationMs)
         if (!videoSuccess) {
             tempVideoFile.delete()
             return@withContext false
         }
 
-        // Step 2: Mux video + audio into the final output
         val muxSuccess = muxVideoAndAudio(tempVideoFile, audioFile, outputFile)
         tempVideoFile.delete()
 
         if (muxSuccess) {
-            logger.i { "Video encoded successfully: ${outputFile.absolutePath}" }
+            logger.i { "Static lyrics video encoded: ${outputFile.absolutePath}" }
         }
         muxSuccess
     } catch (e: Exception) {
@@ -75,10 +117,10 @@ suspend fun encodeLyricsVideo(
 }
 
 /**
- * Encodes the bitmap as a video-only MP4 file.
+ * Encodes animated frames from the renderer into a video-only MP4.
  */
-private fun encodeVideoOnly(
-    bitmap: Bitmap,
+private fun encodeVideoFrames(
+    frameRenderer: LyricsFrameRenderer,
     outputFile: File,
     width: Int,
     height: Int,
@@ -109,13 +151,21 @@ private fun encodeVideoOnly(
     val frameIntervalUs = 1_000_000L / FRAME_RATE
     val totalFrames = ((durationUs + frameIntervalUs - 1) / frameIntervalUs).toInt().coerceAtLeast(1)
 
+    logger.i { "Encoding $totalFrames frames at ${FRAME_RATE}fps for ${durationMs}ms" }
+
     try {
-        // Render frames
         for (frameIndex in 0 until totalFrames) {
             val presentationTimeUs = frameIndex * frameIntervalUs
+            val currentTimeMs = presentationTimeUs / 1000L
 
-            renderBitmapToSurface(bitmap, width, height)
-            eglHelper.setPresentationTime(presentationTimeUs * 1000) // convert to nanoseconds
+            // Render the frame with current active lyric highlighted
+            val frameBitmap = frameRenderer.renderFrame(currentTimeMs)
+
+            // Draw to encoder surface
+            renderBitmapToSurface(frameBitmap, width, height)
+            frameBitmap.recycle()
+
+            eglHelper.setPresentationTime(presentationTimeUs * 1000) // to nanoseconds
             eglHelper.swapBuffers()
 
             // Drain encoder
@@ -137,7 +187,75 @@ private fun encodeVideoOnly(
 
         return true
     } catch (e: Exception) {
-        logger.e(e) { "Failed to encode video frames" }
+        logger.e(e) { "Failed to encode animated video frames" }
+        try { muxer.release() } catch (_: Exception) {}
+        try { eglHelper.release() } catch (_: Exception) {}
+        try { codec.release() } catch (_: Exception) {}
+        return false
+    }
+}
+
+/**
+ * Encodes a static bitmap as video frames (1fps, for fallback/backwards compat).
+ */
+private fun encodeStaticVideo(
+    bitmap: Bitmap,
+    outputFile: File,
+    width: Int,
+    height: Int,
+    durationMs: Long
+): Boolean {
+    val staticFps = 1
+    val format = MediaFormat.createVideoFormat(VIDEO_MIME_TYPE, width, height).apply {
+        setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+        setInteger(MediaFormat.KEY_BIT_RATE, VIDEO_BITRATE)
+        setInteger(MediaFormat.KEY_FRAME_RATE, staticFps)
+        setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+    }
+
+    val codec = MediaCodec.createEncoderByType(VIDEO_MIME_TYPE)
+    codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+
+    val inputSurface = codec.createInputSurface()
+    codec.start()
+
+    val eglHelper = EglHelper(inputSurface)
+    eglHelper.makeCurrent()
+
+    val muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    var videoTrackIndex = -1
+    var muxerStarted = false
+    val bufferInfo = MediaCodec.BufferInfo()
+
+    val durationUs = durationMs * 1000L
+    val frameIntervalUs = 1_000_000L / staticFps
+    val totalFrames = ((durationUs + frameIntervalUs - 1) / frameIntervalUs).toInt().coerceAtLeast(1)
+
+    try {
+        for (frameIndex in 0 until totalFrames) {
+            val presentationTimeUs = frameIndex * frameIntervalUs
+
+            renderBitmapToSurface(bitmap, width, height)
+            eglHelper.setPresentationTime(presentationTimeUs * 1000)
+            eglHelper.swapBuffers()
+
+            drainEncoder(codec, muxer, bufferInfo, videoTrackIndex, muxerStarted, false).let {
+                videoTrackIndex = it.first
+                muxerStarted = it.second
+            }
+        }
+
+        codec.signalEndOfInputStream()
+        drainEncoder(codec, muxer, bufferInfo, videoTrackIndex, muxerStarted, true)
+
+        muxer.stop()
+        muxer.release()
+        eglHelper.release()
+        codec.stop()
+        codec.release()
+        return true
+    } catch (e: Exception) {
+        logger.e(e) { "Failed to encode static video" }
         try { muxer.release() } catch (_: Exception) {}
         try { eglHelper.release() } catch (_: Exception) {}
         try { codec.release() } catch (_: Exception) {}
@@ -222,7 +340,6 @@ private fun muxVideoAndAudio(
 
 /**
  * Drains encoded data from the codec and writes to the muxer.
- * Returns updated (trackIndex, muxerStarted) pair.
  */
 private fun drainEncoder(
     codec: MediaCodec,
@@ -270,10 +387,7 @@ private fun drainEncoder(
             }
             else -> {
                 if (!endOfStream) break
-                // If end of stream and no output yet, try again briefly
-                if (outputBufferIndex == MediaCodec.INFO_TRY_AGAIN_LATER && endOfStream) {
-                    break
-                }
+                if (outputBufferIndex == MediaCodec.INFO_TRY_AGAIN_LATER) break
             }
         }
     }
@@ -282,7 +396,7 @@ private fun drainEncoder(
 }
 
 /**
- * Renders a bitmap to the current OpenGL surface using GLES20.
+ * Renders a bitmap to the current OpenGL surface.
  */
 private fun renderBitmapToSurface(bitmap: Bitmap, width: Int, height: Int) {
     GLES20.glViewport(0, 0, width, height)

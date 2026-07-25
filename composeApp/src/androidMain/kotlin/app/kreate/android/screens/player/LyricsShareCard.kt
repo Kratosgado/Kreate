@@ -96,7 +96,8 @@ fun LyricsSelectionMode(
     val coroutineScope = rememberCoroutineScope()
     val selectedIndices = remember { mutableStateListOf<Int>() }
     var isGenerating by remember { mutableStateOf(false) }
-    var shareAsVideo by remember { mutableStateOf(false) }
+    // 0 = Image, 1 = Video (static), 2 = Animated Video
+    var shareMode by remember { mutableStateOf(0) }
 
     // Parse timestamps from synced lyrics for video mode
     val lyricsWithTimestamps: List<Pair<Long, String>> = remember(syncedLyricsText) {
@@ -162,7 +163,7 @@ fun LyricsSelectionMode(
                                     val sortedIndices = selectedIndices.sorted()
                                     val selectedLines = sortedIndices.map { lyrics[it] }
 
-                                    if (shareAsVideo && isSyncAvailable) {
+                                    if (shareMode != 0 && isSyncAvailable) {
                                         generateAndShareLyricsVideo(
                                             context = context,
                                             selectedLyrics = selectedLines,
@@ -171,7 +172,8 @@ fun LyricsSelectionMode(
                                             thumbnailUrl = thumbnailUrl,
                                             mediaId = mediaId,
                                             lyricsWithTimestamps = lyricsWithTimestamps,
-                                            selectedIndices = sortedIndices
+                                            selectedIndices = sortedIndices,
+                                            animated = shareMode == 2
                                         )
                                     } else {
                                         generateAndShareLyricsCard(
@@ -198,8 +200,10 @@ fun LyricsSelectionMode(
                             )
                         } else {
                             BasicText(
-                                text = if (shareAsVideo) stringResource(R.string.lyrics_share_create_video)
-                                       else stringResource(R.string.lyrics_share_create_card),
+                                text = when (shareMode) {
+                                    0 -> stringResource(R.string.lyrics_share_create_card)
+                                    else -> stringResource(R.string.lyrics_share_create_video)
+                                },
                                 style = typography().xxs.copy(
                                     color = ComposeColor.White,
                                     fontWeight = FontWeight.Bold
@@ -213,7 +217,7 @@ fun LyricsSelectionMode(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Image / Video toggle (only show if synced lyrics available)
+        // Image / Video / Animated toggle (only show if synced lyrics available)
         if (isSyncAvailable) {
             Row(
                 modifier = Modifier
@@ -226,36 +230,55 @@ fun LyricsSelectionMode(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
                         .background(
-                            if (!shareAsVideo) colorPalette().accent.copy(alpha = 0.8f)
+                            if (shareMode == 0) colorPalette().accent.copy(alpha = 0.8f)
                             else ComposeColor.White.copy(alpha = 0.1f)
                         )
-                        .clickable { shareAsVideo = false }
+                        .clickable { shareMode = 0 }
                         .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
                     BasicText(
                         text = "📷 ${stringResource(R.string.lyrics_share_mode_image)}",
                         style = typography().xxs.copy(
                             color = ComposeColor.White,
-                            fontWeight = if (!shareAsVideo) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (shareMode == 0) FontWeight.Bold else FontWeight.Normal
                         )
                     )
                 }
-                // Video mode pill
+                // Video (static) mode pill
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
                         .background(
-                            if (shareAsVideo) colorPalette().accent.copy(alpha = 0.8f)
+                            if (shareMode == 1) colorPalette().accent.copy(alpha = 0.8f)
                             else ComposeColor.White.copy(alpha = 0.1f)
                         )
-                        .clickable { shareAsVideo = true }
+                        .clickable { shareMode = 1 }
                         .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
                     BasicText(
                         text = "🎬 ${stringResource(R.string.lyrics_share_mode_video)}",
                         style = typography().xxs.copy(
                             color = ComposeColor.White,
-                            fontWeight = if (shareAsVideo) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (shareMode == 1) FontWeight.Bold else FontWeight.Normal
+                        )
+                    )
+                }
+                // Animated video mode pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (shareMode == 2) colorPalette().accent.copy(alpha = 0.8f)
+                            else ComposeColor.White.copy(alpha = 0.1f)
+                        )
+                        .clickable { shareMode = 2 }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    BasicText(
+                        text = "✨ ${stringResource(R.string.lyrics_share_mode_animated)}",
+                        style = typography().xxs.copy(
+                            color = ComposeColor.White,
+                            fontWeight = if (shareMode == 2) FontWeight.Bold else FontWeight.Normal
                         )
                     )
                 }
@@ -412,7 +435,8 @@ suspend fun generateAndShareLyricsVideo(
     thumbnailUrl: String?,
     mediaId: String,
     lyricsWithTimestamps: List<Pair<Long, String>>,
-    selectedIndices: List<Int>
+    selectedIndices: List<Int>,
+    animated: Boolean = true
 ) {
     withContext(Dispatchers.IO) {
         try {
@@ -465,14 +489,17 @@ suspend fun generateAndShareLyricsVideo(
                 return@withContext
             }
 
-            // Generate the lyrics card bitmap
-            val cardBitmap = createLyricsCardBitmap(
-                context = context,
-                lyrics = selectedLyrics,
-                songTitle = songTitle,
-                artistName = artistName,
-                thumbnailUrl = thumbnailUrl
-            )
+            // Load album art
+            val albumArt = thumbnailUrl?.let {
+                try {
+                    val hiResUrl = it.replace(Regex("=w\\d+-h\\d+"), "=w800-h800")
+                    app.kreate.android.coil3.ImageFactory.bitmap(hiResUrl).getOrNull()?.let { bmp ->
+                        bmp.copy(Bitmap.Config.ARGB_8888, true)
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
 
             // Encode video
             val shareDir = File(context.cacheDir, "shared_lyrics")
@@ -480,12 +507,50 @@ suspend fun generateAndShareLyricsVideo(
             val videoFile = File(shareDir, "lyrics_video_${System.currentTimeMillis()}.mp4")
             val durationMs = endMs - startMs
 
-            val success = app.kreate.android.screens.player.share.encodeLyricsVideo(
-                cardBitmap = cardBitmap,
-                audioFile = audioFile,
-                outputFile = videoFile,
-                durationMs = durationMs
-            )
+            val success = if (animated) {
+                // Build per-line timestamps for the selected lyrics
+                val selectedTimestamps = selectedIndices.map { idx ->
+                    val tsIdx = (idx + 1).coerceIn(0, lyricsWithTimestamps.lastIndex)
+                    lyricsWithTimestamps[tsIdx].first
+                }
+
+                // Animated: karaoke-style highlighting at 15fps
+                val frameRenderer = app.kreate.android.screens.player.share.LyricsFrameRenderer(
+                    context = context,
+                    lyrics = selectedLyrics,
+                    lyricsTimestamps = selectedTimestamps,
+                    songTitle = songTitle,
+                    artistName = artistName,
+                    startMs = startMs,
+                    albumArt = albumArt
+                )
+
+                val result = app.kreate.android.screens.player.share.encodeLyricsVideo(
+                    frameRenderer = frameRenderer,
+                    audioFile = audioFile,
+                    outputFile = videoFile,
+                    durationMs = durationMs
+                )
+                frameRenderer.release()
+                result
+            } else {
+                // Static: single card image as video
+                val cardBitmap = createLyricsCardBitmap(
+                    context = context,
+                    lyrics = selectedLyrics,
+                    songTitle = songTitle,
+                    artistName = artistName,
+                    thumbnailUrl = thumbnailUrl
+                )
+                app.kreate.android.screens.player.share.encodeLyricsVideo(
+                    cardBitmap = cardBitmap,
+                    audioFile = audioFile,
+                    outputFile = videoFile,
+                    durationMs = durationMs
+                )
+            }
+
+            albumArt?.recycle()
 
             // Clean up audio temp file
             audioFile.delete()

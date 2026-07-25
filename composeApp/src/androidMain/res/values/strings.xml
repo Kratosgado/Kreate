@@ -922,5 +922,6 @@
     <string name="lyrics_share_create_video">Share Video</string>
     <string name="lyrics_share_mode_image">Image</string>
     <string name="lyrics_share_mode_video">Video</string>
+    <string name="lyrics_share_mode_animated">Animated</string>
     <string name="cancel">Cancel</string>
 </resources>
