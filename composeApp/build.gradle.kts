@@ -22,7 +22,7 @@ private fun String.sha256(): String {
 // Only official build env has passwords and keystore to sign the APK
 // Other build environments can have unsigned version instead
 val officialBuildPhrase: String? = System.getenv( "OFFICIAL_BUILD_PASSPHRASE" )
-val isOfficialBuildEnv = !officialBuildPhrase.isNullOrBlank() && officialBuildPhrase.sha256() == "b2c778240e03b2005d23899aa02e51de049223a54d549d082e89dc20e51dd545"
+val isOfficialBuildEnv = !officialBuildPhrase.isNullOrBlank() && officialBuildPhrase.sha256() == "41d104fb23c1eb0e21a615e6a20a6991ea23bdb99e279c2230e5aae3357e8856"
 
 plugins {
     // Multiplatform
