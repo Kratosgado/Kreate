@@ -70,6 +70,7 @@ private val logger = Logger.withTag("LyricsShareCard")
 /**
  * Composable that provides a lyrics selection interface.
  * Users can tap individual lines to select/deselect them.
+ * Supports sharing as image card or video with audio.
  *
  * @param lyrics List of lyric lines to display for selection
  * @param songTitle The title of the current song
@@ -77,6 +78,7 @@ private val logger = Logger.withTag("LyricsShareCard")
  * @param thumbnailUrl URL of the song thumbnail/album art
  * @param mediaId The song's media ID (used for YouTube link)
  * @param currentPosition Current playback position in milliseconds
+ * @param syncedLyricsText Raw LRC text with timestamps (null if lyrics aren't synced)
  * @param onDismiss Callback when selection mode is dismissed
  */
 @Composable
@@ -87,12 +89,22 @@ fun LyricsSelectionMode(
     thumbnailUrl: String?,
     mediaId: String,
     currentPosition: Long,
+    syncedLyricsText: String? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val selectedIndices = remember { mutableStateListOf<Int>() }
     var isGenerating by remember { mutableStateOf(false) }
+    // 0 = Image, 1 = Video (static), 2 = Animated Video
+    var shareMode by remember { mutableStateOf(0) }
+
+    // Parse timestamps from synced lyrics for video mode
+    val lyricsWithTimestamps: List<Pair<Long, String>> = remember(syncedLyricsText) {
+        if (syncedLyricsText == null) emptyList()
+        else it.fast4x.lrclib.LrcLib.Lyrics(syncedLyricsText).sentences
+    }
+    val isSyncAvailable = lyricsWithTimestamps.isNotEmpty()
 
     Column(
         modifier = Modifier
@@ -148,18 +160,32 @@ fun LyricsSelectionMode(
                             .clickable(enabled = !isGenerating) {
                                 coroutineScope.launch {
                                     isGenerating = true
-                                    val selectedLines = selectedIndices
-                                        .sorted()
-                                        .map { lyrics[it] }
-                                    generateAndShareLyricsCard(
-                                        context = context,
-                                        selectedLyrics = selectedLines,
-                                        songTitle = songTitle,
-                                        artistName = artistName,
-                                        thumbnailUrl = thumbnailUrl,
-                                        mediaId = mediaId,
-                                        currentPosition = currentPosition
-                                    )
+                                    val sortedIndices = selectedIndices.sorted()
+                                    val selectedLines = sortedIndices.map { lyrics[it] }
+
+                                    if (shareMode != 0 && isSyncAvailable) {
+                                        generateAndShareLyricsVideo(
+                                            context = context,
+                                            selectedLyrics = selectedLines,
+                                            songTitle = songTitle,
+                                            artistName = artistName,
+                                            thumbnailUrl = thumbnailUrl,
+                                            mediaId = mediaId,
+                                            lyricsWithTimestamps = lyricsWithTimestamps,
+                                            selectedIndices = sortedIndices,
+                                            animated = shareMode == 2
+                                        )
+                                    } else {
+                                        generateAndShareLyricsCard(
+                                            context = context,
+                                            selectedLyrics = selectedLines,
+                                            songTitle = songTitle,
+                                            artistName = artistName,
+                                            thumbnailUrl = thumbnailUrl,
+                                            mediaId = mediaId,
+                                            currentPosition = currentPosition
+                                        )
+                                    }
                                     isGenerating = false
                                     onDismiss()
                                 }
@@ -174,7 +200,10 @@ fun LyricsSelectionMode(
                             )
                         } else {
                             BasicText(
-                                text = stringResource(R.string.lyrics_share_create_card),
+                                text = when (shareMode) {
+                                    0 -> stringResource(R.string.lyrics_share_create_card)
+                                    else -> stringResource(R.string.lyrics_share_create_video)
+                                },
                                 style = typography().xxs.copy(
                                     color = ComposeColor.White,
                                     fontWeight = FontWeight.Bold
@@ -186,7 +215,75 @@ fun LyricsSelectionMode(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Image / Video / Animated toggle (only show if synced lyrics available)
+        if (isSyncAvailable) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Image mode pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (shareMode == 0) colorPalette().accent.copy(alpha = 0.8f)
+                            else ComposeColor.White.copy(alpha = 0.1f)
+                        )
+                        .clickable { shareMode = 0 }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    BasicText(
+                        text = "📷 ${stringResource(R.string.lyrics_share_mode_image)}",
+                        style = typography().xxs.copy(
+                            color = ComposeColor.White,
+                            fontWeight = if (shareMode == 0) FontWeight.Bold else FontWeight.Normal
+                        )
+                    )
+                }
+                // Video (static) mode pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (shareMode == 1) colorPalette().accent.copy(alpha = 0.8f)
+                            else ComposeColor.White.copy(alpha = 0.1f)
+                        )
+                        .clickable { shareMode = 1 }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    BasicText(
+                        text = "🎬 ${stringResource(R.string.lyrics_share_mode_video)}",
+                        style = typography().xxs.copy(
+                            color = ComposeColor.White,
+                            fontWeight = if (shareMode == 1) FontWeight.Bold else FontWeight.Normal
+                        )
+                    )
+                }
+                // Animated video mode pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (shareMode == 2) colorPalette().accent.copy(alpha = 0.8f)
+                            else ComposeColor.White.copy(alpha = 0.1f)
+                        )
+                        .clickable { shareMode = 2 }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    BasicText(
+                        text = "✨ ${stringResource(R.string.lyrics_share_mode_animated)}",
+                        style = typography().xxs.copy(
+                            color = ComposeColor.White,
+                            fontWeight = if (shareMode == 2) FontWeight.Bold else FontWeight.Normal
+                        )
+                    )
+                }
+            }
+        }
 
         // Selected count indicator
         if (selectedIndices.isNotEmpty()) {
@@ -313,14 +410,188 @@ suspend fun generateAndShareLyricsCard(
                     type = "image/png"
                     putExtra(Intent.EXTRA_STREAM, uri)
                     putExtra(Intent.EXTRA_TEXT, shareText)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    clipData = android.content.ClipData.newRawUri(null, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                context.startActivity(
-                    Intent.createChooser(shareIntent, null)
-                )
+                context.startActivity(Intent.createChooser(shareIntent, null))
             }
         } catch (e: Exception) {
             logger.e(e) { "Failed to generate/share lyrics card" }
+        }
+    }
+}
+
+/**
+ * Generates a lyrics video (MP4) with audio from the song and shares it.
+ *
+ * Uses the synced lyrics timestamps to determine the audio segment,
+ * renders the lyrics card as a static video frame, and muxes with the audio.
+ */
+suspend fun generateAndShareLyricsVideo(
+    context: Context,
+    selectedLyrics: List<String>,
+    songTitle: String,
+    artistName: String,
+    thumbnailUrl: String?,
+    mediaId: String,
+    lyricsWithTimestamps: List<Pair<Long, String>>,
+    selectedIndices: List<Int>,
+    animated: Boolean = true
+) {
+    withContext(Dispatchers.IO) {
+        try {
+            // Determine audio start/end from synced lyrics timestamps.
+            // lyricsWithTimestamps includes the initial (0, "") entry at index 0.
+            // Parsed plain lyrics (without blanks) correspond to entries starting at index 1.
+            val firstSelectedIdx = selectedIndices.first()
+            val lastSelectedIdx = selectedIndices.last()
+
+            val startTimestampIdx = (firstSelectedIdx + 1).coerceIn(0, lyricsWithTimestamps.lastIndex)
+            val endTimestampIdx = (lastSelectedIdx + 2).coerceIn(0, lyricsWithTimestamps.lastIndex)
+
+            val startMs = lyricsWithTimestamps[startTimestampIdx].first
+            val endMs = if (endTimestampIdx <= lyricsWithTimestamps.lastIndex) {
+                lyricsWithTimestamps[endTimestampIdx].first
+            } else {
+                // Last line: add 5 seconds after it starts
+                lyricsWithTimestamps.last().first + 5000L
+            }
+
+            if (endMs <= startMs) {
+                logger.e { "Invalid time range: start=$startMs, end=$endMs" }
+                return@withContext
+            }
+
+            // Extract audio segment from cache
+            val cache: androidx.media3.datasource.cache.Cache by org.koin.java.KoinJavaComponent.inject(
+                androidx.media3.datasource.cache.Cache::class.java, app.kreate.di.CacheType.CACHE
+            )
+            val downloadCache: androidx.media3.datasource.cache.Cache by org.koin.java.KoinJavaComponent.inject(
+                androidx.media3.datasource.cache.Cache::class.java, app.kreate.di.CacheType.DOWNLOAD
+            )
+
+            val audioFile = app.kreate.android.screens.player.share.extractAudioSegment(
+                context = context,
+                songId = mediaId,
+                cache = cache,
+                downloadCache = downloadCache,
+                startMs = startMs,
+                endMs = endMs
+            )
+
+            if (audioFile == null) {
+                logger.e { "Failed to extract audio segment. Song may not be cached." }
+                // Fall back to image share
+                generateAndShareLyricsCard(
+                    context, selectedLyrics, songTitle, artistName,
+                    thumbnailUrl, mediaId, startMs
+                )
+                return@withContext
+            }
+
+            // Load album art
+            val albumArt = thumbnailUrl?.let {
+                try {
+                    val hiResUrl = it.replace(Regex("=w\\d+-h\\d+"), "=w800-h800")
+                    app.kreate.android.coil3.ImageFactory.bitmap(hiResUrl).getOrNull()?.let { bmp ->
+                        bmp.copy(Bitmap.Config.ARGB_8888, true)
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            // Encode video
+            val shareDir = File(context.cacheDir, "shared_lyrics")
+            shareDir.mkdirs()
+            val videoFile = File(shareDir, "lyrics_video_${System.currentTimeMillis()}.mp4")
+            val durationMs = endMs - startMs
+
+            val success = if (animated) {
+                // Build per-line timestamps for the selected lyrics
+                val selectedTimestamps = selectedIndices.map { idx ->
+                    val tsIdx = (idx + 1).coerceIn(0, lyricsWithTimestamps.lastIndex)
+                    lyricsWithTimestamps[tsIdx].first
+                }
+
+                // Animated: karaoke-style highlighting at 15fps
+                val frameRenderer = app.kreate.android.screens.player.share.LyricsFrameRenderer(
+                    context = context,
+                    lyrics = selectedLyrics,
+                    lyricsTimestamps = selectedTimestamps,
+                    songTitle = songTitle,
+                    artistName = artistName,
+                    startMs = startMs,
+                    albumArt = albumArt
+                )
+
+                val result = app.kreate.android.screens.player.share.encodeLyricsVideo(
+                    frameRenderer = frameRenderer,
+                    audioFile = audioFile,
+                    outputFile = videoFile,
+                    durationMs = durationMs
+                )
+                frameRenderer.release()
+                result
+            } else {
+                // Static: single card image as video
+                val cardBitmap = createLyricsCardBitmap(
+                    context = context,
+                    lyrics = selectedLyrics,
+                    songTitle = songTitle,
+                    artistName = artistName,
+                    thumbnailUrl = thumbnailUrl
+                )
+                app.kreate.android.screens.player.share.encodeLyricsVideo(
+                    cardBitmap = cardBitmap,
+                    audioFile = audioFile,
+                    outputFile = videoFile,
+                    durationMs = durationMs
+                )
+            }
+
+            albumArt?.recycle()
+
+            // Clean up audio temp file
+            audioFile.delete()
+
+            if (!success) {
+                logger.e { "Video encoding failed, falling back to image share" }
+                generateAndShareLyricsCard(
+                    context, selectedLyrics, songTitle, artistName,
+                    thumbnailUrl, mediaId, startMs
+                )
+                return@withContext
+            }
+
+            // Share the video
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                videoFile
+            )
+
+            val shareText = buildString {
+                append("\"${selectedLyrics.joinToString("\n")}\"")
+                append("\n\n— $songTitle by $artistName")
+                append("\n\n🎵 https://music.youtube.com/watch?v=$mediaId")
+                val seconds = (startMs / 1000).toInt()
+                if (seconds > 0) append("&t=${seconds}s")
+            }
+
+            withContext(Dispatchers.Main) {
+                val shareIntent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    type = "video/mp4"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TEXT, shareText)
+                    clipData = android.content.ClipData.newRawUri(null, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, null))
+            }
+        } catch (e: Exception) {
+            logger.e(e) { "Failed to generate/share lyrics video" }
         }
     }
 }
@@ -378,9 +649,9 @@ private suspend fun createLyricsCardBitmap(
         try {
             val hiResUrl = it.replace(Regex("=w\\d+-h\\d+"), "=w800-h800")
             ImageFactory.bitmap(hiResUrl).getOrNull()?.let { bmp ->
-                if (bmp.config == Bitmap.Config.HARDWARE) {
-                    bmp.copy(Bitmap.Config.ARGB_8888, true).also { bmp.recycle() }
-                } else bmp
+                // Always copy to a mutable software bitmap.
+                // Don't recycle the original — Coil's memory cache owns it.
+                bmp.copy(Bitmap.Config.ARGB_8888, true)
             }
         } catch (e: Exception) {
             logger.w(e) { "Failed to load thumbnail for lyrics card" }
