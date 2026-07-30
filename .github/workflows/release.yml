@@ -1,0 +1,133 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+# Prevent multiple jobs from running at the same time
+concurrency:
+  group: 'release-deploy'
+  cancel-in-progress: false
+
+jobs:
+  build_time:
+    name: Capture current time
+    runs-on: ubuntu-latest
+    outputs:
+      date: ${{ steps.date.outputs.date }}
+
+    steps:
+      - name: Get date
+        id: date
+        run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+
+  versioning:
+    name: Extract version
+    runs-on: ubuntu-latest
+    outputs:
+      downstream: ${{ steps.downstream.outputs.version }}
+      code: ${{ steps.downstream.outputs.code }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Get version from gradle
+        id: downstream
+        run: |
+          VERSION_NAME=$(grep -E '^\s*versionName\s*= "' gradle/libs.versions.toml | awk -F '"' '{print $2}')
+          echo "version=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+          VERSION_CODE=$(grep -E '^\s*versionCode\s*= "' gradle/libs.versions.toml | awk -F '"' '{print $2}')
+          echo "code=$VERSION_CODE" >> $GITHUB_OUTPUT
+
+  build:
+    needs: [build_time, versioning]
+    name: Build ${{ matrix.architect }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      BUILD_DATE: ${{ needs.build_time.outputs.date }}
+      STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+      KEY_PASSWORD: ${{ secrets.PROD_KEY_PASSWORD }}
+      OFFICIAL_BUILD_PASSPHRASE: ${{ secrets.OFFICIAL_BUILD_PASSPHRASE }}
+      KEYSTORE_PATH: ${{ vars.KEYSTORE_PATH }}
+      KEYSTORE_FILENAME: production.jks
+
+    strategy:
+      matrix:
+        architect: ['Universal', 'Arm64', 'Arm32', 'X86', 'X86_64']
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Decode keystore
+        run: |
+          mkdir -p "$KEYSTORE_PATH"
+          echo "${{ secrets.PROD_KEYSTORE }}" | base64 -d > "$KEYSTORE_PATH/$KEYSTORE_FILENAME"
+
+      - name: Verify keystore integrity
+        run: echo "${{ secrets.PROD_KEYSTORE_SHA256 }} $KEYSTORE_PATH/$KEYSTORE_FILENAME" | sha256sum -c
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v5.5.0
+        with:
+          java-version: "21"
+          distribution: "corretto"
+
+      - name: Restore Gradle cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ./build
+            ./composeApp/build
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Build APK
+        run: ./gradlew "assembleGithub${{ matrix.architect }}ProdRelease"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk-${{ matrix.architect }}
+          path: composeApp/build/outputs/apk/github${{ matrix.architect }}Prod/release/*.apk
+
+  release:
+    needs: [build_time, versioning, build]
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all APKs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: apk-*
+          merge-multiple: true
+
+      - name: Upload to GitHub Release
+        if: ${{ !env.ACT }}
+        uses: softprops/action-gh-release@v3
+        with:
+          files: '*.apk'
+          name: v${{ needs.versioning.outputs.downstream }}-${{ needs.build_time.outputs.date }}
+          tag_name: v${{ needs.versioning.outputs.downstream }}
+          make_latest: "true"
+          body: |
+            ## Kreate v${{ needs.versioning.outputs.downstream }}
+
+            Download the universal APK if unsure which architecture to pick.
+
+          token: ${{ secrets.RELEASE_TOKEN }}
+          generate_release_notes: true
+          target_commitish: ${{ github.sha }}
