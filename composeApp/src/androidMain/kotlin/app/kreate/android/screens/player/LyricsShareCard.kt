@@ -107,48 +107,43 @@ fun LyricsSelectionMode(
     val isSyncAvailable = lyricsWithTimestamps.isNotEmpty()
 
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         // Header with instructions and action buttons
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             BasicText(
                 text = stringResource(R.string.lyrics_share_select_lines),
-                style =
-                    typography().xs.copy(
-                        color = ComposeColor.White,
-                        fontWeight = FontWeight.Bold,
-                    ),
+                style = typography().xs.copy(
+                    color = ComposeColor.White,
+                    fontWeight = FontWeight.Bold
+                )
             )
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // Cancel button
                 Box(
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(ComposeColor.White.copy(alpha = 0.2f))
-                            .clickable { onDismiss() }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(ComposeColor.White.copy(alpha = 0.2f))
+                        .clickable { onDismiss() }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     BasicText(
                         text = stringResource(R.string.cancel),
-                        style =
-                            typography().xxs.copy(
-                                color = ComposeColor.White,
-                            ),
+                        style = typography().xxs.copy(
+                            color = ComposeColor.White
+                        )
                     )
                 }
 
@@ -156,7 +151,7 @@ fun LyricsSelectionMode(
                 AnimatedVisibility(
                     visible = selectedIndices.isNotEmpty(),
                     enter = fadeIn() + slideInVertically(),
-                    exit = fadeOut() + slideOutVertically(),
+                    exit = fadeOut() + slideOutVertically()
                 ) {
                     Box(
                         modifier = Modifier
@@ -201,7 +196,7 @@ fun LyricsSelectionMode(
                             CircularProgressIndicator(
                                 modifier = Modifier.size(14.dp),
                                 color = ComposeColor.White,
-                                strokeWidth = 2.dp,
+                                strokeWidth = 2.dp
                             )
                         } else {
                             BasicText(
@@ -294,69 +289,57 @@ fun LyricsSelectionMode(
         if (selectedIndices.isNotEmpty()) {
             BasicText(
                 text = "${selectedIndices.size} line${if (selectedIndices.size > 1) "s" else ""} selected",
-                style =
-                    typography().xxs.copy(
-                        color = colorPalette().accent,
-                    ),
-                modifier = Modifier.padding(bottom = 8.dp),
+                style = typography().xxs.copy(
+                    color = colorPalette().accent
+                ),
+                modifier = Modifier.padding(bottom = 8.dp)
             )
         }
 
         // Lyrics selection list
         LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             itemsIndexed(lyrics) { index, line ->
                 if (line.isBlank()) return@itemsIndexed
 
                 val isSelected = index in selectedIndices
                 Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (isSelected) {
-                                    colorPalette().accent.copy(alpha = 0.3f)
-                                } else {
-                                    ComposeColor.White.copy(alpha = 0.05f)
-                                },
-                            ).then(
-                                if (isSelected) {
-                                    Modifier.border(
-                                        width = 1.dp,
-                                        color = colorPalette().accent,
-                                        shape = RoundedCornerShape(8.dp),
-                                    )
-                                } else {
-                                    Modifier
-                                },
-                            ).clickable {
-                                if (isSelected) {
-                                    selectedIndices.remove(index)
-                                } else {
-                                    selectedIndices.add(index)
-                                }
-                            }.padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (isSelected) colorPalette().accent.copy(alpha = 0.3f)
+                            else ComposeColor.White.copy(alpha = 0.05f)
+                        )
+                        .then(
+                            if (isSelected) Modifier.border(
+                                width = 1.dp,
+                                color = colorPalette().accent,
+                                shape = RoundedCornerShape(8.dp)
+                            ) else Modifier
+                        )
+                        .clickable {
+                            if (isSelected) {
+                                selectedIndices.remove(index)
+                            } else {
+                                selectedIndices.add(index)
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     BasicText(
                         text = line,
-                        style =
-                            typography().s.copy(
-                                color =
-                                    if (isSelected) {
-                                        ComposeColor.White
-                                    } else {
-                                        ComposeColor.White.copy(alpha = 0.7f)
-                                    },
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                textAlign = TextAlign.Center,
-                            ),
-                        modifier = Modifier.fillMaxWidth(),
+                        style = typography().s.copy(
+                            color = if (isSelected) ComposeColor.White
+                            else ComposeColor.White.copy(alpha = 0.7f),
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -382,18 +365,17 @@ suspend fun generateAndShareLyricsCard(
     artistName: String,
     thumbnailUrl: String?,
     mediaId: String,
-    currentPosition: Long,
+    currentPosition: Long
 ) {
     withContext(Dispatchers.IO) {
         try {
-            val cardBitmap =
-                createLyricsCardBitmap(
-                    context = context,
-                    lyrics = selectedLyrics,
-                    songTitle = songTitle,
-                    artistName = artistName,
-                    thumbnailUrl = thumbnailUrl,
-                )
+            val cardBitmap = createLyricsCardBitmap(
+                context = context,
+                lyrics = selectedLyrics,
+                songTitle = songTitle,
+                artistName = artistName,
+                thumbnailUrl = thumbnailUrl
+            )
 
             // Save the bitmap to a temp file
             val shareDir = File(context.cacheDir, "shared_lyrics")
@@ -404,24 +386,22 @@ suspend fun generateAndShareLyricsCard(
             }
 
             // Get content URI via FileProvider
-            val uri =
-                FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    imageFile,
-                )
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                imageFile
+            )
 
             // Build share text with optional music link
-            val shareText =
-                buildString {
-                    append("\"${selectedLyrics.joinToString("\n")}\"")
-                    append("\n\n— $songTitle by $artistName")
-                    append("\n\n🎵 https://music.youtube.com/watch?v=$mediaId")
-                    if (currentPosition > 0) {
-                        val seconds = (currentPosition / 1000).toInt()
-                        append("&t=${seconds}s")
-                    }
+            val shareText = buildString {
+                append("\"${selectedLyrics.joinToString("\n")}\"")
+                append("\n\n— $songTitle by $artistName")
+                append("\n\n🎵 https://music.youtube.com/watch?v=$mediaId")
+                if (currentPosition > 0) {
+                    val seconds = (currentPosition / 1000).toInt()
+                    append("&t=${seconds}s")
                 }
+            }
 
             // Launch share intent
             withContext(Dispatchers.Main) {
@@ -629,42 +609,37 @@ private suspend fun createLyricsCardBitmap(
     lyrics: List<String>,
     songTitle: String,
     artistName: String,
-    thumbnailUrl: String?,
+    thumbnailUrl: String?
 ): Bitmap {
     val cardWidth = 1080
     val padding = 80f
-    val topBarHeight = 100f // space for app icon row
-    val bottomInfoHeight = 140f // space for album art + song info row
+    val topBarHeight = 100f      // space for app icon row
+    val bottomInfoHeight = 140f  // space for album art + song info row
     val bottomPadding = 80f
 
     // Measure lyrics text height to calculate dynamic card height
-    val lyricsPaint =
-        TextPaint().apply {
-            color = Color.WHITE
-            textSize = 58f
-            isAntiAlias = true
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-            letterSpacing = 0.01f
-        }
+    val lyricsPaint = TextPaint().apply {
+        color = Color.WHITE
+        textSize = 58f
+        isAntiAlias = true
+        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.01f
+    }
     val lyricsText = lyrics.joinToString("\n")
     val textWidth = (cardWidth - padding * 2).toInt()
-    val lyricsLayout =
-        StaticLayout.Builder
-            .obtain(lyricsText, 0, lyricsText.length, lyricsPaint, textWidth)
-            .setAlignment(Layout.Alignment.ALIGN_CENTER)
-            .setLineSpacing(24f, 1.3f)
-            .setIncludePad(true)
-            .build()
+    val lyricsLayout = StaticLayout.Builder
+        .obtain(lyricsText, 0, lyricsText.length, lyricsPaint, textWidth)
+        .setAlignment(Layout.Alignment.ALIGN_CENTER)
+        .setLineSpacing(24f, 1.3f)
+        .setIncludePad(true)
+        .build()
     val lyricsHeight = lyricsLayout.height.toFloat()
 
     // Calculate total card height: padding + top bar + gap + lyrics + gap + bottom info + padding
-    val cardHeight =
-        (
-            padding + topBarHeight + 60f + lyricsHeight + 80f +
-                bottomInfoHeight + bottomPadding
-        ).toInt()
-            .coerceIn(800, 1920)
+    val cardHeight = (padding + topBarHeight + 60f + lyricsHeight + 80f
+            + bottomInfoHeight + bottomPadding).toInt()
+        .coerceIn(800, 1920)
 
     val bitmap = Bitmap.createBitmap(cardWidth, cardHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -678,7 +653,11 @@ private suspend fun createLyricsCardBitmap(
                 // Don't recycle the original — Coil's memory cache owns it.
                 bmp.copy(Bitmap.Config.ARGB_8888, true)
             }
+        } catch (e: Exception) {
+            logger.w(e) { "Failed to load thumbnail for lyrics card" }
+            null
         }
+    }
 
     // 1. Draw full-bleed blurred background
     drawBackground(canvas, cardWidth, cardHeight, albumArt)
@@ -703,91 +682,71 @@ private suspend fun drawBackground(
     canvas: Canvas,
     width: Int,
     height: Int,
-    albumArt: Bitmap?,
+    albumArt: Bitmap?
 ) {
     if (albumArt != null) {
         // Scale album art to cover the entire card (center-crop)
         val srcRatio = albumArt.width.toFloat() / albumArt.height.toFloat()
         val dstRatio = width.toFloat() / height.toFloat()
 
-        val scaled =
-            if (srcRatio > dstRatio) {
-                // Source is wider — fit height, crop width
-                val scaledWidth = (height * srcRatio).toInt()
-                Bitmap.createScaledBitmap(albumArt, scaledWidth, height, true)
-            } else {
-                // Source is taller — fit width, crop height
-                val scaledHeight = (width / srcRatio).toInt()
-                Bitmap.createScaledBitmap(albumArt, width, scaledHeight, true)
-            }
+        val scaled = if (srcRatio > dstRatio) {
+            // Source is wider — fit height, crop width
+            val scaledWidth = (height * srcRatio).toInt()
+            Bitmap.createScaledBitmap(albumArt, scaledWidth, height, true)
+        } else {
+            // Source is taller — fit width, crop height
+            val scaledHeight = (width / srcRatio).toInt()
+            Bitmap.createScaledBitmap(albumArt, width, scaledHeight, true)
+        }
 
         // Center crop
         val cropX = ((scaled.width - width) / 2).coerceAtLeast(0)
         val cropY = ((scaled.height - height) / 2).coerceAtLeast(0)
-        val cropped =
-            Bitmap.createBitmap(
-                scaled,
-                cropX,
-                cropY,
-                width.coerceAtMost(scaled.width - cropX),
-                height.coerceAtMost(scaled.height - cropY),
-            )
+        val cropped = Bitmap.createBitmap(
+            scaled, cropX, cropY,
+            width.coerceAtMost(scaled.width - cropX),
+            height.coerceAtMost(scaled.height - cropY)
+        )
 
         // Heavy blur for background
         val blurred = cropped.blur(0.5f, 25)
         canvas.drawBitmap(
             Bitmap.createScaledBitmap(blurred, width, height, true),
-            0f,
-            0f,
-            null,
+            0f, 0f, null
         )
         blurred.recycle()
         if (cropped !== scaled) cropped.recycle()
         scaled.recycle()
     } else {
         // Fallback: rich dark gradient
-        val bgPaint =
-            Paint().apply {
-                shader =
-                    LinearGradient(
-                        0f,
-                        0f,
-                        width.toFloat(),
-                        height.toFloat(),
-                        Color.parseColor("#0f0c29"),
-                        Color.parseColor("#302b63"),
-                        Shader.TileMode.CLAMP,
-                    )
-            }
+        val bgPaint = Paint().apply {
+            shader = LinearGradient(
+                0f, 0f, width.toFloat(), height.toFloat(),
+                Color.parseColor("#0f0c29"),
+                Color.parseColor("#302b63"),
+                Shader.TileMode.CLAMP
+            )
+        }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
     }
 }
 
-private fun drawGradientOverlay(
-    canvas: Canvas,
-    width: Int,
-    height: Int,
-) {
+private fun drawGradientOverlay(canvas: Canvas, width: Int, height: Int) {
     // Strong vignette-like overlay: dark at top and bottom, slightly lighter in the middle
-    val overlayPaint =
-        Paint().apply {
-            shader =
-                LinearGradient(
-                    0f,
-                    0f,
-                    0f,
-                    height.toFloat(),
-                    intArrayOf(
-                        Color.argb(200, 0, 0, 0), // top: very dark
-                        Color.argb(120, 0, 0, 0), // upper middle
-                        Color.argb(100, 0, 0, 0), // center
-                        Color.argb(140, 0, 0, 0), // lower middle
-                        Color.argb(230, 0, 0, 0), // bottom: very dark
-                    ),
-                    floatArrayOf(0f, 0.25f, 0.45f, 0.7f, 1f),
-                    Shader.TileMode.CLAMP,
-                )
-        }
+    val overlayPaint = Paint().apply {
+        shader = LinearGradient(
+            0f, 0f, 0f, height.toFloat(),
+            intArrayOf(
+                Color.argb(200, 0, 0, 0),   // top: very dark
+                Color.argb(120, 0, 0, 0),   // upper middle
+                Color.argb(100, 0, 0, 0),   // center
+                Color.argb(140, 0, 0, 0),   // lower middle
+                Color.argb(230, 0, 0, 0)    // bottom: very dark
+            ),
+            floatArrayOf(0f, 0.25f, 0.45f, 0.7f, 1f),
+            Shader.TileMode.CLAMP
+        )
+    }
     canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
 }
 
@@ -797,7 +756,7 @@ private fun drawGradientOverlay(
 private fun drawAppIcon(
     context: Context,
     canvas: Canvas,
-    padding: Float,
+    padding: Float
 ) {
     val iconSize = 72f
     val iconTop = padding
@@ -811,15 +770,14 @@ private fun drawAppIcon(
         iconDrawable.draw(iconCanvas)
 
         // Draw with circular clipping
-        val path =
-            android.graphics.Path().apply {
-                addCircle(
-                    iconLeft + iconSize / 2f,
-                    iconTop + iconSize / 2f,
-                    iconSize / 2f,
-                    android.graphics.Path.Direction.CW,
-                )
-            }
+        val path = android.graphics.Path().apply {
+            addCircle(
+                iconLeft + iconSize / 2f,
+                iconTop + iconSize / 2f,
+                iconSize / 2f,
+                android.graphics.Path.Direction.CW
+            )
+        }
         canvas.save()
         canvas.clipPath(path)
         canvas.drawBitmap(iconBitmap, iconLeft, iconTop, null)
@@ -827,21 +785,19 @@ private fun drawAppIcon(
         iconBitmap.recycle()
     } catch (e: Exception) {
         // Fallback: draw a simple circle with "K"
-        val circlePaint =
-            Paint().apply {
-                color = Color.argb(80, 255, 255, 255)
-                isAntiAlias = true
-            }
+        val circlePaint = Paint().apply {
+            color = Color.argb(80, 255, 255, 255)
+            isAntiAlias = true
+        }
         canvas.drawCircle(iconLeft + iconSize / 2f, iconTop + iconSize / 2f, iconSize / 2f, circlePaint)
 
-        val textPaint =
-            TextPaint().apply {
-                color = Color.WHITE
-                textSize = 36f
-                isAntiAlias = true
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            }
+        val textPaint = TextPaint().apply {
+            color = Color.WHITE
+            textSize = 36f
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        }
         canvas.drawText("K", iconLeft + iconSize / 2f, iconTop + iconSize / 2f + 12f, textPaint)
     }
 }
@@ -851,17 +807,16 @@ private fun drawLyricsText(
     lyricsLayout: StaticLayout,
     width: Int,
     startY: Float,
-    padding: Float,
+    padding: Float
 ) {
     // Draw a subtle quote decoration
-    val quotePaint =
-        TextPaint().apply {
-            color = Color.argb(40, 255, 255, 255)
-            textSize = 140f
-            isAntiAlias = true
-            typeface = Typeface.create("serif", Typeface.ITALIC)
-            textAlign = Paint.Align.LEFT
-        }
+    val quotePaint = TextPaint().apply {
+        color = Color.argb(40, 255, 255, 255)
+        textSize = 140f
+        isAntiAlias = true
+        typeface = Typeface.create("serif", Typeface.ITALIC)
+        textAlign = Paint.Align.LEFT
+    }
     canvas.drawText("\u201C", padding - 20f, startY + 70f, quotePaint)
 
     canvas.save()
@@ -880,11 +835,11 @@ private fun drawSongInfoRow(
     albumArt: Bitmap?,
     width: Int,
     height: Int,
-    padding: Float,
+    padding: Float
 ) {
     val thumbSize = 96f
     val cornerRadius = 16f
-    val rowY = height - padding - thumbSize // vertically position the row
+    val rowY = height - padding - thumbSize  // vertically position the row
     val thumbLeft = padding
     val textLeft = thumbLeft + thumbSize + 24f
 
@@ -892,15 +847,13 @@ private fun drawSongInfoRow(
     if (albumArt != null) {
         val scaledArt = Bitmap.createScaledBitmap(albumArt, thumbSize.toInt(), thumbSize.toInt(), true)
 
-        val path =
-            android.graphics.Path().apply {
-                addRoundRect(
-                    RectF(thumbLeft, rowY, thumbLeft + thumbSize, rowY + thumbSize),
-                    cornerRadius,
-                    cornerRadius,
-                    android.graphics.Path.Direction.CW,
-                )
-            }
+        val path = android.graphics.Path().apply {
+            addRoundRect(
+                RectF(thumbLeft, rowY, thumbLeft + thumbSize, rowY + thumbSize),
+                cornerRadius, cornerRadius,
+                android.graphics.Path.Direction.CW
+            )
+        }
         canvas.save()
         canvas.clipPath(path)
         canvas.drawBitmap(scaledArt, thumbLeft, rowY, null)
@@ -908,76 +861,64 @@ private fun drawSongInfoRow(
         scaledArt.recycle()
 
         // Subtle border
-        val borderPaint =
-            Paint().apply {
-                style = Paint.Style.STROKE
-                color = Color.argb(50, 255, 255, 255)
-                strokeWidth = 2f
-                isAntiAlias = true
-            }
+        val borderPaint = Paint().apply {
+            style = Paint.Style.STROKE
+            color = Color.argb(50, 255, 255, 255)
+            strokeWidth = 2f
+            isAntiAlias = true
+        }
         canvas.drawRoundRect(
             RectF(thumbLeft, rowY, thumbLeft + thumbSize, rowY + thumbSize),
-            cornerRadius,
-            cornerRadius,
-            borderPaint,
+            cornerRadius, cornerRadius, borderPaint
         )
     } else {
         // Placeholder
-        val placeholderPaint =
-            Paint().apply {
-                color = Color.argb(40, 255, 255, 255)
-                isAntiAlias = true
-            }
+        val placeholderPaint = Paint().apply {
+            color = Color.argb(40, 255, 255, 255)
+            isAntiAlias = true
+        }
         canvas.drawRoundRect(
             RectF(thumbLeft, rowY, thumbLeft + thumbSize, rowY + thumbSize),
-            cornerRadius,
-            cornerRadius,
-            placeholderPaint,
+            cornerRadius, cornerRadius, placeholderPaint
         )
-        val notePaint =
-            TextPaint().apply {
-                color = Color.argb(100, 255, 255, 255)
-                textSize = 40f
-                isAntiAlias = true
-                textAlign = Paint.Align.CENTER
-            }
+        val notePaint = TextPaint().apply {
+            color = Color.argb(100, 255, 255, 255)
+            textSize = 40f
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
         canvas.drawText("♪", thumbLeft + thumbSize / 2f, rowY + thumbSize / 2f + 14f, notePaint)
     }
 
     // Song title (to the right of thumbnail, vertically centered)
-    val titlePaint =
-        TextPaint().apply {
-            color = Color.WHITE
-            textSize = 38f
-            isAntiAlias = true
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            textAlign = Paint.Align.LEFT
-        }
+    val titlePaint = TextPaint().apply {
+        color = Color.WHITE
+        textSize = 38f
+        isAntiAlias = true
+        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        textAlign = Paint.Align.LEFT
+    }
 
     val maxTextWidth = width - textLeft - padding
-    val displayTitle =
-        if (titlePaint.measureText(songTitle) > maxTextWidth) {
-            var truncated = songTitle
-            while (titlePaint.measureText("$truncated…") > maxTextWidth && truncated.isNotEmpty()) {
-                truncated = truncated.dropLast(1)
-            }
-            "$truncated…"
-        } else {
-            songTitle
+    val displayTitle = if (titlePaint.measureText(songTitle) > maxTextWidth) {
+        var truncated = songTitle
+        while (titlePaint.measureText("$truncated…") > maxTextWidth && truncated.isNotEmpty()) {
+            truncated = truncated.dropLast(1)
         }
+        "$truncated…"
+    } else songTitle
 
     val titleY = rowY + thumbSize / 2f - 8f
     canvas.drawText(displayTitle, textLeft, titleY, titlePaint)
 
     // Artist name (below title)
-    val artistPaint =
-        TextPaint().apply {
-            color = Color.argb(160, 255, 255, 255)
-            textSize = 32f
-            isAntiAlias = true
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-            textAlign = Paint.Align.LEFT
-        }
+    val artistPaint = TextPaint().apply {
+        color = Color.argb(160, 255, 255, 255)
+        textSize = 32f
+        isAntiAlias = true
+        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+    }
     canvas.drawText(artistName, textLeft, titleY + 42f, artistPaint)
 }
 
@@ -985,15 +926,11 @@ private fun drawSongInfoRow(
  * Parses synced lyrics text (LRC format) into a list of plain text lines.
  * Removes timestamps like [00:12.34] from each line.
  */
-fun parseLyricsToLines(
-    text: String?,
-    isSynced: Boolean,
-): List<String> {
+fun parseLyricsToLines(text: String?, isSynced: Boolean): List<String> {
     if (text.isNullOrBlank()) return emptyList()
 
     return if (isSynced) {
-        text
-            .lines()
+        text.lines()
             .map { line -> line.replace(Regex("\\[\\d{2}:\\d{2}\\.\\d{2,3}]"), "").trim() }
             .filter { it.isNotBlank() }
     } else {
