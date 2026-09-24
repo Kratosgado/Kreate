@@ -35,7 +35,12 @@ object PlayerConfigStore {
 
     private val logger = Logger.withTag(TAG)
     private val REMOTE_URL by lazy {
-        val encoded = "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL01ldHJvbGlzdEdyb3VwL01ldHJvbGlzdC9tYWluL2FwcC9zcmMvbWFpbi9hc3NldHMvcGxheWVyX2NvbmZpZ3MuanNvbg=="
+        // ZemerTeam/zemer-cipher master — the actively-maintained successor to Metrolist's
+        // player_configs.json (identical schema/PlayerConfigStore). Metrolist entered maintenance
+        // mode and deleted its copy (app/src/main/assets/player_configs.json now 404s), which broke
+        // the self-heal for every YouTube player rotation past sts 20629. Decodes to:
+        // https://raw.githubusercontent.com/ZemerTeam/zemer-cipher/master/library/src/main/assets/player_configs.json
+        val encoded = "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL1plbWVyVGVhbS96ZW1lci1jaXBoZXIvbWFzdGVyL2xpYnJhcnkvc3JjL21haW4vYXNzZXRzL3BsYXllcl9jb25maWdzLmpzb24="
         String(Base64.decode(encoded, Base64.DEFAULT), StandardCharsets.UTF_8)
     }
 

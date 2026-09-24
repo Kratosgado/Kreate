@@ -114,6 +114,10 @@ hypnoticcanvas-shaders = { group = "com.mikepenz.hypnoticcanvas", name = "hypnot
 
 # Newpipe extractor
 nanojson = { group = "com.github.TeamNewPipe", name = "nanojson", version = "e9d656ddb49a412a5a0a5d5ef20ca7ef09549996" }
+# Pinned to 6305155 (2026-04-06): later commits (e.g. 3cd3341) are built for JVM 25 and won't
+# resolve against this project's JVM 21 target. This fork tracks Bilibili/playlist fixes, not YT
+# cipher rotations, so the config table (player_configs.json) remains the primary sig/n source;
+# this only backs the table-free NewPipe fallback in YTPlayerUtils.findUrlOrNull.
 metrolist-extractor = { module = "com.github.MetrolistGroup:MetrolistExtractor", version = "6305155" }
 
 # Annotations
