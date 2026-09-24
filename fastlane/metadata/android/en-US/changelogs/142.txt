@@ -1,0 +1,4 @@
+Fixed:
+- Streaming and downloads not working after a YouTube player update
+- Refreshed the bundled player configuration table to the current YouTube player
+- Restored automatic player-config updates so future YouTube changes self-heal
